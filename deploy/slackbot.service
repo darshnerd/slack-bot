@@ -1,0 +1,17 @@
+[Unit]
+Description=Slack Bot
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=simple
+Restart=always
+RestartSec=5
+# Path to the cloned repo on the server
+WorkingDirectory=/root/slack-bot
+# Run `which node` on the server and update this path if it differs
+ExecStart=/usr/bin/node index.js
+TimeoutStartSec=0
+
+[Install]
+WantedBy=multi-user.target

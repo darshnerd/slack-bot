@@ -133,6 +133,26 @@ You can repeat this pattern for any free API (browse [free-apis.github.io](https
   - Double-check the tokens: `xoxb-` goes in `SLACK_BOT_TOKEN`, `xapp-` goes in `SLACK_APP_TOKEN`.
   - Watch the terminal running `node index.js` for errors (e.g. `invalid_auth` means wrong tokens).
 
+## Makefile shortcuts
+
+A `Makefile` provides convenient shortcuts. Run `make help` to list them all.
+
+| Target | What it does |
+| --- | --- |
+| `make install` | Install npm dependencies |
+| `make env` | Create `.env` from `.env.example` if missing |
+| `make run` | Run the bot locally (`node index.js`) |
+| `make dev` | Install deps then run locally |
+| `make deploy` | (server) `git pull`, `npm install`, restart the service |
+| `make logs` | (server) Follow the systemd service logs |
+| `make status` | (server) Show the systemd service status |
+| `make restart` / `make stop` | (server) Restart / stop the service |
+| `make enable` / `make disable` | (server) Enable / disable on boot |
+
+## Deployment
+
+To run the bot 24/7 on a server (Ubuntu + systemd), see the [Deployment Guide](DEPLOYMENT.md). A ready-to-use service file is provided at [`deploy/slackbot.service`](deploy/slackbot.service). The server-side `make` targets above wrap the common `systemctl` commands.
+
 ## License
 
 This project is licensed under the [MIT License](LICENSE).
