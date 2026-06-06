@@ -1,32 +1,38 @@
 name: Deploy to Nest
 
 # Deploy on every push to main, or manually from the Actions tab.
+# Runs on a self-hosted runner installed ON the Nest container, so no
+# inbound SSH is needed (Nest sits behind a bastion that only accepts
+# your account key, which makes SSH-from-GitHub impractical).
 on:
   push:
     branches: [main]
   workflow_dispatch:
 
-# Prevent overlapping deploys.
 concurrency:
   group: deploy-production
   cancel-in-progress: false
 
 jobs:
   deploy:
-    runs-on: ubuntu-latest
+    runs-on: self-hosted
     steps:
-      - name: Deploy over SSH
-        uses: appleboy/ssh-action@v1.2.0
-        with:
-          host: ${{ secrets.SSH_HOST }}
-          username: ${{ secrets.SSH_USER }}
-          key: ${{ secrets.SSH_PRIVATE_KEY }}
-          port: ${{ secrets.SSH_PORT }}
-          script: |
-            set -e
-            export XDG_RUNTIME_DIR="/run/user/$(id -u)"
-            cd ~/slack-bot
-            git pull --ff-only
-            npm ci --omit=dev || npm install --omit=dev
-            systemctl --user restart slackbot.service
-            systemctl --user is-active slackbot.service
+      - name: Check out the latest code
+        uses: actions/checkout@v4
+
+      - name: Install dependencies
+        run: npm ci --omit=dev || npm install --omit=dev
+
+      - name: Sync code into the bot directory
+        run: |
+          rsync -a --delete \
+            --exclude '.git' \
+            --exclude '.env' \
+            --exclude 'scores.json' \
+            ./ "$HOME/slack-bot/"
+
+      - name: Restart the service
+        run: |
+          export XDG_RUNTIME_DIR="/run/user/$(id -u)"
+          systemctl --user restart slackbot.service
+          systemctl --user is-active slackbot.service

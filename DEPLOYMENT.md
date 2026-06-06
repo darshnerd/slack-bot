@@ -123,48 +123,46 @@ systemctl start slackbot.service
 systemctl disable slackbot.service
 ```
 
-## Continuous deployment with GitHub Actions
+## Continuous deployment with GitHub Actions (self-hosted runner)
 
-The repo includes a workflow at [`.github/workflows/deploy.yml`](.github/workflows/deploy.yml) that automatically deploys on every push to `main` (and can also be triggered manually from the **Actions** tab). It SSHes into the server, pulls the latest code, installs dependencies, and restarts the service.
+The repo includes a workflow at [`.github/workflows/deploy.yml`](.github/workflows/deploy.yml) that automatically deploys on every push to `main` (or manually from the **Actions** tab).
 
-### One-time setup
+> **Why a self-hosted runner instead of SSH?** Nest sits behind a bastion/gateway (`hackclub.app`) that only accepts SSH keys registered to your Hack Club account — keys added to the container's local `~/.ssh/authorized_keys` are rejected before the connection reaches the container. That makes the usual "SSH from GitHub" deploy impractical. Instead, we install a **GitHub Actions runner on Nest itself**, so the deploy job runs locally and needs no inbound SSH.
 
-**1. Create a dedicated SSH key for CI** (on your local machine):
+### One-time setup: install the runner on Nest
 
-```bash
-ssh-keygen -t ed25519 -C "github-actions-deploy" -f ~/.ssh/slackbot_deploy
-```
-
-Add the **public** key to the server's authorized keys:
+**1. Get the runner download + token.** In GitHub: repo → **Settings → Actions → Runners → New self-hosted runner → Linux x64**. GitHub shows you a `curl` download command and a `./config.sh ... --token <TOKEN>` command. Run them on Nest:
 
 ```bash
-# copy ~/.ssh/slackbot_deploy.pub, then on the server:
-echo "ssh-ed25519 AAAA... github-actions-deploy" >> ~/.ssh/authorized_keys
+cd ~
+mkdir -p actions-runner && cd actions-runner
+# (use the exact URL/version GitHub shows you)
+curl -o actions-runner.tar.gz -L https://github.com/actions/runner/releases/download/v2.X.X/actions-runner-linux-x64-2.X.X.tar.gz
+tar xzf actions-runner.tar.gz
+./config.sh --url https://github.com/darshnerd/slack-bot --token <TOKEN>
 ```
 
-**2. Add the repository secrets** in GitHub → **Settings → Secrets and variables → Actions → New repository secret**:
+Accept the defaults at the prompts (runner name, labels — keep `self-hosted`, work folder `_work`).
 
-| Secret | Value |
-| --- | --- |
-| `SSH_HOST` | Server IP or hostname (e.g. `10.60.2.110` or your public address) |
-| `SSH_USER` | SSH user (e.g. `root`) |
-| `SSH_PORT` | SSH port (usually `22`) |
-| `SSH_PRIVATE_KEY` | Contents of the **private** key `~/.ssh/slackbot_deploy` |
-
-**3. Allow the service restart without a password prompt.** The workflow runs `sudo systemctl restart slackbot.service`. If the SSH user is `root` this already works. For a non-root user, add a sudoers rule:
+**2. Run the runner as a service** so it survives reboots and keeps listening:
 
 ```bash
-echo "youruser ALL=(ALL) NOPASSWD: /bin/systemctl restart slackbot.service, /bin/systemctl is-active slackbot.service" \
-  | sudo tee /etc/sudoers.d/slackbot
+sudo ./svc.sh install        # or: ./svc.sh install   (user mode)
+sudo ./svc.sh start
+sudo ./svc.sh status
 ```
+
+> On Nest (no real root / user-level systemd) you can instead run it under your user systemd, or simply `./run.sh` inside a `tmux`/`screen` session for a quick setup. The `svc.sh` approach is preferred if it works in your container.
+
+**3. Make sure the bot service + `.env` already exist** on Nest (see the systemd sections above). The workflow restarts `slackbot.service`; it does not create it or your tokens.
 
 ### How it runs
 
-- **Push to `main`** → the workflow connects over SSH and runs `git pull`, `npm ci`, and restarts the service.
-- **Manual run** → use the **Run workflow** button on the Actions tab (`workflow_dispatch`).
-- The final `systemctl is-active` step fails the job if the bot didn't come back up, so a broken deploy shows up as a red ❌ in GitHub.
+- **Push to `main`** (or manual run) → GitHub queues the job; the Nest runner picks it up locally.
+- The job checks out the latest code, runs `npm ci`, rsyncs it into `~/slack-bot` (excluding `.git`, `.env`, and `scores.json` so your secrets and scores are untouched), then `systemctl --user restart slackbot.service`.
+- The final `systemctl --user is-active` step fails the job red if the bot didn't come back up.
 
-> The server must be able to `git pull` non-interactively. Since `.env` is gitignored, it stays on the server untouched across deploys — you only set it up once.
+> Because the runner runs *on* Nest, `.env` and `scores.json` already live there and are excluded from the sync — you set tokens up once.
 
 ## Running on Hack Club Nest (user-level systemd)
 
