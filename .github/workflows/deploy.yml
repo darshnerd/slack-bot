@@ -1,4 +1,4 @@
-name: Deploy to server
+name: Deploy to Nest
 
 # Deploy on every push to main, or manually from the Actions tab.
 on:
@@ -24,8 +24,9 @@ jobs:
           port: ${{ secrets.SSH_PORT }}
           script: |
             set -e
-            cd /root/slack-bot
+            export XDG_RUNTIME_DIR="/run/user/$(id -u)"
+            cd ~/slack-bot
             git pull --ff-only
             npm ci --omit=dev || npm install --omit=dev
-            sudo systemctl restart slackbot.service
-            sudo systemctl is-active slackbot.service
+            systemctl --user restart slackbot.service
+            systemctl --user is-active slackbot.service

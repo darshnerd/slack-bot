@@ -1,6 +1,6 @@
 # slack-bot
 
-A simple Slack bot built with [Bolt for JavaScript](https://slack.dev/bolt-js/) running in **Socket Mode**. It provides several slash commands — a latency check, a help menu, and two API-backed commands (a random cat fact and a random joke).
+A simple Slack bot built with [Bolt for JavaScript](https://slack.dev/bolt-js/) running in **Socket Mode**. It provides several slash commands — a latency check, a help menu, API-backed commands (a random cat fact and a random joke), and a trivia game with a persistent leaderboard.
 
 ## Features
 
@@ -10,6 +10,7 @@ A simple Slack bot built with [Bolt for JavaScript](https://slack.dev/bolt-js/) 
 - 📖 `/dsb-darsh-help` — lists all available commands
 - 🐱 `/dsb-darsh-catfact` — fetches a random cat fact from an API
 - 😂 `/dsb-darsh-joke` — fetches a random joke from an API
+- 🧠 `/dsb-darsh-trivia` — a multiple-choice trivia game with a persistent leaderboard
 - 🔐 Tokens stored safely in a `.env` file (never committed)
 
 ## Commands
@@ -20,6 +21,17 @@ A simple Slack bot built with [Bolt for JavaScript](https://slack.dev/bolt-js/) 
 | `/dsb-darsh-help` | Lists all available commands | local |
 | `/dsb-darsh-catfact` | Returns a random cat fact | [catfact.ninja](https://catfact.ninja) |
 | `/dsb-darsh-joke` | Returns a random joke (setup + punchline) | [official-joke-api](https://official-joke-api.appspot.com) |
+| `/dsb-darsh-trivia` | Asks a multiple-choice trivia question | [Open Trivia DB](https://opentdb.com) |
+| `/dsb-darsh-answer [A/B/C/D]` | Answers the current trivia question | local |
+| `/dsb-darsh-score` | Shows the trivia leaderboard | local |
+
+### Trivia game
+
+1. Run `/dsb-darsh-trivia` to get a random multiple-choice question (A–D).
+2. Answer with `/dsb-darsh-answer A` (or B/C/D). A correct answer adds 1 point to your score.
+3. Run `/dsb-darsh-score` to see the leaderboard (sorted high → low, with 🥇🥈🥉 for the top three).
+
+Scores are persisted to a `scores.json` file in the project root, so they survive restarts. That file is gitignored (it holds per-user data, not code). Each user has their own active question, so multiple people can play at once.
 
 > **Note on naming:** Slash command names must be **unique across an entire Slack workspace**. These commands use the `dsb-darsh-` prefix to avoid clashing with commands registered by other people in the same workspace.
 
@@ -67,6 +79,9 @@ In your Slack app dashboard, go to **Slash Commands** and create each command so
 - `/dsb-darsh-help`
 - `/dsb-darsh-catfact`
 - `/dsb-darsh-joke`
+- `/dsb-darsh-trivia`
+- `/dsb-darsh-answer`
+- `/dsb-darsh-score`
 
 In Socket Mode the Request URL can be left as a placeholder. Reinstall the app to your workspace if Slack prompts you.
 

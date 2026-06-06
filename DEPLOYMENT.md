@@ -166,6 +166,70 @@ echo "youruser ALL=(ALL) NOPASSWD: /bin/systemctl restart slackbot.service, /bin
 
 > The server must be able to `git pull` non-interactively. Since `.env` is gitignored, it stays on the server untouched across deploys — you only set it up once.
 
+## Running on Hack Club Nest (user-level systemd)
+
+On a full VM/root server you use **system-level** systemd (`systemctl`, service file in `/etc/systemd/system/`). On **Nest** you don't have root, so you use **user-level** systemd instead:
+
+- Put the service file in `~/.config/systemd/user/slackbot.service` (the same contents work; set `WorkingDirectory` to your project path on Nest, e.g. `/home/youruser/slack-bot`).
+- Manage it with the `--user` flag:
+
+```bash
+systemctl --user daemon-reload
+systemctl --user enable --now slackbot.service
+systemctl --user status slackbot.service
+journalctl --user -u slackbot.service
+```
+
+- To keep the service running after you log out, enable lingering once: `loginctl enable-linger $USER`.
+- For CI deploys on Nest, drop the `sudo` from the workflow and use `systemctl --user restart slackbot.service`.
+
+## Troubleshooting
+
+Check the logs first:
+
+```bash
+# system service
+journalctl -u slackbot.service -f
+# user service (Nest)
+journalctl --user -u slackbot.service
+```
+
+Common deployment issues:
+
+- **Wrong token** — confirm `xoxb-` is in `SLACK_BOT_TOKEN` and `xapp-` is in `SLACK_APP_TOKEN` (an `invalid_auth` error means they're wrong or swapped).
+- **Missing `.env`** — it lives on the server, not in your repo (it's gitignored). Recreate it if a fresh clone is missing it.
+- **Wrong working directory** — the `WorkingDirectory=` line in the service file must point to the absolute path of the project on the server.
+- **Missing dependencies** — re-run `npm install` inside the project folder.
+
+## Lifecycle commands
+
+```bash
+# system service
+systemctl start slackbot.service
+systemctl stop slackbot.service
+systemctl restart slackbot.service
+
+# user service (Nest)
+systemctl --user start slackbot.service
+systemctl --user stop slackbot.service
+systemctl --user restart slackbot.service
+```
+
+## Further reading
+
+- [Slack API Docs](https://api.slack.com/)
+- [Slack Bolt for JavaScript](https://slack.dev/bolt-js/tutorial/getting-started)
+- [Node.js Docs](https://nodejs.org/en/docs)
+- [Nest Quickstart Guide](https://guides.hackclub.app/index.php/Quickstart)
+
+## Ideas to extend the bot
+
+- Daily standup reporter (posts a summary at 9am)
+- Fun facts bot (`/dsb-darsh-fact`)
+- Moderation: auto-flag messages with banned words
+- Games: trivia bot with score tracking
+- Integrations: post GitHub PR updates
+
 ## Notes & gotchas
 
 - **Only run one instance.** Slack Socket Mode will bounce commands between instances if the same tokens are used in two places. Stop any local/dev copy (e.g. `node index.js` on your laptop) once the server instance is live.
