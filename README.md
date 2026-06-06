@@ -1,13 +1,27 @@
 # slack-bot
 
-A simple Slack bot built with [Bolt for JavaScript](https://slack.dev/bolt-js/) running in **Socket Mode**. It registers a `/dsb-ping` slash command that replies with a "Pong!" message and the round-trip latency.
+A simple Slack bot built with [Bolt for JavaScript](https://slack.dev/bolt-js/) running in **Socket Mode**. It provides several slash commands — a latency check, a help menu, and two API-backed commands (a random cat fact and a random joke).
 
 ## Features
 
 - ⚡ Built on `@slack/bolt`
 - 🔌 Runs in Socket Mode (no public URL / webhook required)
-- 🏓 `/dsb-ping` slash command that reports latency
+- 🏓 `/dsb-darsh-ping` — reports the bot's latency
+- 📖 `/dsb-darsh-help` — lists all available commands
+- 🐱 `/dsb-darsh-catfact` — fetches a random cat fact from an API
+- 😂 `/dsb-darsh-joke` — fetches a random joke from an API
 - 🔐 Tokens stored safely in a `.env` file (never committed)
+
+## Commands
+
+| Command | Description | Source |
+| --- | --- | --- |
+| `/dsb-darsh-ping` | Replies with `Pong!` and the round-trip latency in ms | local |
+| `/dsb-darsh-help` | Lists all available commands | local |
+| `/dsb-darsh-catfact` | Returns a random cat fact | [catfact.ninja](https://catfact.ninja) |
+| `/dsb-darsh-joke` | Returns a random joke (setup + punchline) | [official-joke-api](https://official-joke-api.appspot.com) |
+
+> **Note on naming:** Slash command names must be **unique across an entire Slack workspace**. These commands use the `dsb-darsh-` prefix to avoid clashing with commands registered by other people in the same workspace.
 
 ## Prerequisites
 
@@ -17,7 +31,7 @@ A simple Slack bot built with [Bolt for JavaScript](https://slack.dev/bolt-js/) 
   - A **Bot User OAuth Token** (`xoxb-...`) from **OAuth & Permissions**
   - An **App-Level Token** (`xapp-...`) with the `connections:write` scope from **Basic Information → App-Level Tokens**
   - **Socket Mode** enabled
-  - A slash command named `/dsb-ping` configured
+  - The slash commands above configured (see [Registering commands](#registering-commands-in-slack))
 
 ## Setup
 
@@ -45,9 +59,22 @@ A simple Slack bot built with [Bolt for JavaScript](https://slack.dev/bolt-js/) 
 
    > The `.env` file is listed in `.gitignore` so your secrets never get committed.
 
+## Registering commands in Slack
+
+In your Slack app dashboard, go to **Slash Commands** and create each command so the names match the ones in `index.js`:
+
+- `/dsb-darsh-ping`
+- `/dsb-darsh-help`
+- `/dsb-darsh-catfact`
+- `/dsb-darsh-joke`
+
+In Socket Mode the Request URL can be left as a placeholder. Reinstall the app to your workspace if Slack prompts you.
+
 ## Running the bot
 
 ```bash
+npm start
+# or
 node index.js
 ```
 
@@ -57,13 +84,7 @@ If everything is configured correctly you will see:
 bot is running!
 ```
 
-Then, in any Slack channel, type:
-
-```
-/dsb-ping
-```
-
-The bot will reply with `Pong!` and the measured latency.
+Then, in any Slack channel, type one of the commands (e.g. `/dsb-darsh-ping`). The bot will reply accordingly.
 
 ## How the command works
 
@@ -83,14 +104,34 @@ app.command("/command-name", async ({ ack, respond }) => {
 
 > `ack()` is required and must run within ~3 seconds. If you don't acknowledge in time, Slack treats the command as failed and shows the user an error.
 
+### How the API-backed commands work
+
+The cat fact and joke commands follow the same flow:
+
+1. The user runs a slash command
+2. The bot acknowledges it with `ack()`
+3. The bot sends a request to an external API using `axios`
+4. The API returns data
+5. The bot sends that data back into Slack with `respond()`
+
+The common ingredients:
+
+- **`axios`** — to make the API request
+- **`try/catch`** — so a failed/rate-limited request doesn't crash the bot
+- **`respond()`** — to send the result back to Slack
+
+You can repeat this pattern for any free API (browse [free-apis.github.io](https://free-apis.github.io)). Just remember to register each new command in the Slack dashboard, and keep any API keys in `.env` — never in your code.
+
 ## Troubleshooting
 
 - **`npm: command not found`** — Node.js isn't installed. Download it from [nodejs.org](https://nodejs.org/en/download).
+- **`This command is already in use` when registering a command** — the name is taken by someone else in the workspace. Use a more unique prefix and update both `index.js` and the dashboard.
 - **Nothing happens when you run the command:**
   - Make sure your terminal is in the project folder (the one containing `index.js`).
+  - Restart the bot after editing `index.js` (Ctrl+C, then `node index.js`).
+  - Confirm the command name in the Slack dashboard exactly matches the one in `index.js`.
   - Double-check the tokens: `xoxb-` goes in `SLACK_BOT_TOKEN`, `xapp-` goes in `SLACK_APP_TOKEN`.
-  - Watch the terminal running `node index.js` for errors.
-  - Confirm the slash command name in your Slack app dashboard matches the one in `index.js`.
+  - Watch the terminal running `node index.js` for errors (e.g. `invalid_auth` means wrong tokens).
 
 ## License
 
